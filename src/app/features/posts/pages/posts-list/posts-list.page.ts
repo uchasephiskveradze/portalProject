@@ -5,7 +5,6 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../../../../core/auth/services/auth.service';
 import { EmptyStateComponent } from '../../../../shared/components/empty-state/empty-state.component';
 import { ErrorStateComponent } from '../../../../shared/components/error-state/error-state.component';
-import { InfiniteScrollDirective } from '../../../../shared/infinite-scroll.directive';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { PostsFiltersComponent } from '../../components/posts-filters/posts-filters.component';
 import { PostsLoadingStateComponent } from '../../components/posts-loading-state/posts-loading-state.component';
@@ -20,7 +19,6 @@ export type PostsListViewState = 'loading' | 'error' | 'empty' | 'content';
   imports: [
     RouterLink,
     TranslatePipe,
-    InfiniteScrollDirective,
     PostsFiltersComponent,
     PostsPaginationComponent,
     PostsTableComponent,

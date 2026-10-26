@@ -1,6 +1,6 @@
 # Blog Management System
 
-SPA built with Angular 22 for managing blog posts with CRUD, search, sorting, pagination, moderation, and role-based access.
+Angular 22 SPA for managing blog posts: CRUD, search, sorting, pagination, virtual infinite scroll, moderation, and role-based access.
 
 ## Run the project
 
@@ -15,19 +15,24 @@ Install dependencies:
 npm install
 ```
 
-Start the mock backend:
+Start the mock API and the app in two terminals:
 
 ```bash
 npm run api
 ```
-
-Start the Angular app:
 
 ```bash
 npm start
 ```
 
 Open `http://localhost:4200`.
+
+Demo accounts:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@blog.com` | `admin123` |
+| User | `user@blog.com` | `user123` |
 
 Useful commands:
 
@@ -43,13 +48,23 @@ npm run build
 npx serve dist/asterbit-task/browser -l 4200
 ```
 
+## Features
+
+- Login with route guards for guests, authenticated users, and admins
+- Public posts list with title search and date sorting
+- Page mode, or infinite scroll that virtualizes rows with Angular CDK so off-screen posts leave the DOM
+- Create, edit, and delete posts, with an unsaved-changes check on the form
+- My Posts tabs for under review, approved, and rejected submissions
+- Admin moderation for pending posts
+- English and Georgian UI, plus light and dark theme
+
 ## Versions
 
 - Angular: `22`
 - TypeScript: `6`
 - RxJS: `7.8`
 - NgRx Signals: `21.1.1`
-- Angular Material: `22`
+- Angular Material / CDK: `22`
 - ngx-translate: `18`
 - json-server: `1.0.0-beta.15`
 - Vitest: `4`
@@ -61,6 +76,7 @@ npx serve dist/asterbit-task/browser -l 4200
 | `@angular/router` | Standalone routing, lazy routes, route params, resolver integration |
 | `@angular/forms` | Reactive forms and validation |
 | `@angular/material` | Buttons and loading UI where Material made sense |
+| `@angular/cdk/scrolling` | Virtual scroll viewport for infinite scroll, so only nearby rows stay in the DOM |
 | `@ngrx/signals` | Feature-level signal stores for posts flows |
 | `@ngx-translate/core` | English / Georgian UI translations |
 | `rxjs` | Async flows with `switchMap`, `debounceTime`, `distinctUntilChanged`, `catchError`, `tap`, `finalize` |
@@ -74,7 +90,7 @@ The project uses a **feature-based structure**:
 - `core/` for cross-app concerns such as auth, routing, interceptors, i18n, theme, and layout
 - `features/auth/` for login
 - `features/posts/` for posts pages, components, models, resolver, guards, services, and stores
-- `shared/` for reusable UI pieces, styles, directives, utilities, and pipes
+- `shared/` for reusable UI pieces, styles, utilities, and pipes
 
 The code follows **SRP** by separating responsibilities:
 

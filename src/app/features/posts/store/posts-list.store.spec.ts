@@ -114,4 +114,60 @@ describe('PostsListStore', () => {
       },
     });
   });
+
+  it('should append the next page in infinite scroll mode', async () => {
+    const secondPost: Post = { ...approvedPost, id: '2', title: 'Second Post' };
+    const infiniteApi = {
+      getPosts: vi
+        .fn()
+        .mockReturnValueOnce(of({ posts: [approvedPost], totalItems: 2 }))
+        .mockReturnValueOnce(of({ posts: [approvedPost, secondPost], totalItems: 2 })),
+    };
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        PostsListStore,
+        { provide: PostsApiService, useValue: infiniteApi },
+        {
+          provide: PostsViewStorageService,
+          useValue: { read: () => 'infinite-scroll' as const, write: vi.fn() },
+        },
+      ],
+    });
+
+    const infiniteStore = TestBed.inject(PostsListStore);
+
+    infiniteStore.loadPosts();
+    await vi.waitFor(() => expect(infiniteStore.loading()).toBe(false));
+
+    expect(infiniteApi.getPosts).toHaveBeenLastCalledWith({
+      force: false,
+      query: {
+        status: POST_STATUS.approved,
+        titleLike: undefined,
+        sort: 'createdAt',
+        order: 'desc',
+        page: 1,
+        limit: infiniteStore.pageSize,
+      },
+    });
+
+    infiniteStore.loadMore();
+    await vi.waitFor(() => expect(infiniteStore.posts()).toEqual([approvedPost, secondPost]));
+
+    expect(infiniteStore.loadingMore()).toBe(false);
+    expect(infiniteStore.filtering()).toBe(false);
+    expect(infiniteApi.getPosts).toHaveBeenLastCalledWith({
+      force: false,
+      query: {
+        status: POST_STATUS.approved,
+        titleLike: undefined,
+        sort: 'createdAt',
+        order: 'desc',
+        page: 2,
+        limit: infiniteStore.pageSize,
+      },
+    });
+  });
 });

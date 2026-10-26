@@ -21,97 +21,158 @@
   </div>
 </ng-template>
 
-<div class="posts-table__scroll">
-  <table class="posts-table">
-    <thead class="posts-table__head">
-      <tr class="posts-table__head-row">
-        <th class="posts-table__head-cell">{{ 'posts.table.title' | translate }}</th>
-        <th class="posts-table__head-cell">{{ 'posts.table.author' | translate }}</th>
-        <th class="posts-table__head-cell">{{ 'posts.table.date' | translate }}</th>
-        <th class="posts-table__head-cell posts-table__head-cell--actions">{{ 'posts.table.actions' | translate }}</th>
-      </tr>
-    </thead>
-    <tbody class="posts-table__body">
-      @for (post of posts(); track post.id) {
-        <tr
-          class="posts-table__row"
-          [class.posts-table__row--with-rejection]="showRejectionCallout() && post.rejectionReason"
-        >
-          <td class="posts-table__cell posts-table__cell--primary">
-            <a
-              class="posts-table__title-link"
-              [routerLink]="['/posts', post.id]"
-              [queryParams]="detailsQueryParams()"
-            >
-              <span class="posts-table__title">{{ post.title }}</span>
-              <span class="posts-table__description">{{ post.description }}</span>
-            </a>
-            <div class="posts-table__meta">
-              <span class="posts-table__author">{{ post.author }}</span>
-              <span class="posts-table__meta-separator" aria-hidden="true">·</span>
-              <time class="posts-table__date">{{ post.createdAt | date: 'MMM d, y':undefined:locale.dateLocale() }}</time>
-            </div>
-          </td>
-          <td class="posts-table__cell posts-table__cell--desktop">
+<ng-template #rowMain let-post="post">
+  <a
+    class="posts-table__title-link"
+    [routerLink]="['/posts', post.id]"
+    [queryParams]="detailsQueryParams()"
+  >
+    <span class="posts-table__title" [class.posts-table__title--single-line]="virtualScroll()">
+      {{ post.title }}
+    </span>
+    <span class="posts-table__description">{{ post.description }}</span>
+  </a>
+  <div class="posts-table__meta">
+    <span class="posts-table__author">{{ post.author }}</span>
+    <span class="posts-table__meta-separator" aria-hidden="true">·</span>
+    <time class="posts-table__date">{{
+      post.createdAt | date: 'MMM d, y' : undefined : locale.dateLocale()
+    }}</time>
+  </div>
+</ng-template>
+
+<ng-template #rowActions let-post="post">
+  <div class="posts-table__actions-bar">
+    <a
+      class="posts-table__action"
+      [routerLink]="['/posts', post.id]"
+      [queryParams]="detailsQueryParams()"
+      [attr.aria-label]="'posts.table.viewPost' | translate"
+    >
+      <span class="material-symbols-outlined">visibility</span>
+    </a>
+    @if (showAdminActions() && auth.isAdmin()) {
+      <a
+        class="posts-table__action"
+        [routerLink]="['/posts', post.id, 'edit']"
+        [queryParams]="{ from: 'list' }"
+        [attr.aria-label]="'posts.table.editPost' | translate"
+      >
+        <span class="material-symbols-outlined">edit</span>
+      </a>
+    } @else if (canOwnerEdit(post)) {
+      <a
+        class="posts-table__action"
+        [routerLink]="['/posts', post.id, 'edit']"
+        [queryParams]="ownerEditQueryParams()"
+        [attr.aria-label]="'posts.table.editPost' | translate"
+      >
+        <span class="material-symbols-outlined">edit</span>
+      </a>
+    } @else if (canOwnerResubmit(post)) {
+      <a
+        class="posts-table__action"
+        [routerLink]="['/posts', post.id, 'edit']"
+        [queryParams]="ownerEditQueryParams()"
+        [attr.aria-label]="'posts.myPosts.rejectionNotice.editResubmit' | translate"
+      >
+        <span class="material-symbols-outlined">edit</span>
+      </a>
+    }
+  </div>
+</ng-template>
+
+@if (virtualScroll()) {
+  <div class="posts-table posts-table--virtual" [style.--posts-table-row-size.px]="itemSize()">
+    <div class="posts-table__head">
+      <div class="posts-table__head-row posts-table__virtual-head">
+        <span class="posts-table__head-cell">{{ 'posts.table.title' | translate }}</span>
+        <span class="posts-table__head-cell">{{ 'posts.table.author' | translate }}</span>
+        <span class="posts-table__head-cell">{{ 'posts.table.date' | translate }}</span>
+        <span class="posts-table__head-cell posts-table__head-cell--actions">{{
+          'posts.table.actions' | translate
+        }}</span>
+      </div>
+    </div>
+
+    <cdk-virtual-scroll-viewport
+      class="posts-table__viewport"
+      [itemSize]="itemSize()"
+      (scrolledIndexChange)="onScrolledIndexChange()"
+    >
+      <div
+        *cdkVirtualFor="let post of posts(); trackBy: trackPost"
+        class="posts-table__virtual-row"
+      >
+        <div class="posts-table__virtual-card">
+          <div class="posts-table__cell posts-table__cell--primary">
+            <ng-container *ngTemplateOutlet="rowMain; context: { post }" />
+          </div>
+          <div class="posts-table__cell posts-table__cell--desktop">
             <span class="posts-table__author">{{ post.author }}</span>
-          </td>
-          <td class="posts-table__cell posts-table__cell--desktop">
-            <time class="posts-table__date">{{ post.createdAt | date: 'MMM d, y':undefined:locale.dateLocale() }}</time>
-          </td>
-          <td class="posts-table__cell posts-table__cell--actions">
-            <div class="posts-table__actions-bar">
-              <a
-                class="posts-table__action"
-                [routerLink]="['/posts', post.id]"
-                [queryParams]="detailsQueryParams()"
-                [attr.aria-label]="'posts.table.viewPost' | translate"
-              >
-                <span class="material-symbols-outlined">visibility</span>
-              </a>
-              @if (showAdminActions() && auth.isAdmin()) {
-                <a
-                  class="posts-table__action"
-                  [routerLink]="['/posts', post.id, 'edit']"
-                  [queryParams]="{ from: 'list' }"
-                  [attr.aria-label]="'posts.table.editPost' | translate"
-                >
-                  <span class="material-symbols-outlined">edit</span>
-                </a>
-              } @else if (canOwnerEdit(post)) {
-                <a
-                  class="posts-table__action"
-                  [routerLink]="['/posts', post.id, 'edit']"
-                  [queryParams]="ownerEditQueryParams()"
-                  [attr.aria-label]="'posts.table.editPost' | translate"
-                >
-                  <span class="material-symbols-outlined">edit</span>
-                </a>
-              } @else if (canOwnerResubmit(post)) {
-                <a
-                  class="posts-table__action"
-                  [routerLink]="['/posts', post.id, 'edit']"
-                  [queryParams]="ownerEditQueryParams()"
-                  [attr.aria-label]="'posts.myPosts.rejectionNotice.editResubmit' | translate"
-                >
-                  <span class="material-symbols-outlined">edit</span>
-                </a>
-              }
-            </div>
-            @if (showRejectionCallout() && post.rejectionReason) {
-              <div class="posts-table__rejection-host posts-table__rejection-host--mobile">
-                <ng-container *ngTemplateOutlet="rejectionCallout; context: { post }" />
-              </div>
-            }
-          </td>
+          </div>
+          <div class="posts-table__cell posts-table__cell--desktop">
+            <time class="posts-table__date">{{
+              post.createdAt | date: 'MMM d, y' : undefined : locale.dateLocale()
+            }}</time>
+          </div>
+          <div class="posts-table__cell posts-table__cell--actions">
+            <ng-container *ngTemplateOutlet="rowActions; context: { post }" />
+          </div>
+        </div>
+      </div>
+    </cdk-virtual-scroll-viewport>
+  </div>
+} @else {
+  <div class="posts-table__scroll">
+    <table class="posts-table">
+      <thead class="posts-table__head">
+        <tr class="posts-table__head-row">
+          <th class="posts-table__head-cell">{{ 'posts.table.title' | translate }}</th>
+          <th class="posts-table__head-cell">{{ 'posts.table.author' | translate }}</th>
+          <th class="posts-table__head-cell">{{ 'posts.table.date' | translate }}</th>
+          <th class="posts-table__head-cell posts-table__head-cell--actions">
+            {{ 'posts.table.actions' | translate }}
+          </th>
         </tr>
-        @if (showRejectionCallout() && post.rejectionReason) {
-          <tr class="posts-table__callout-row posts-table__callout-row--desktop">
-            <td class="posts-table__callout-cell" colspan="4">
-              <ng-container *ngTemplateOutlet="rejectionCallout; context: { post }" />
+      </thead>
+      <tbody class="posts-table__body">
+        @for (post of posts(); track post.id) {
+          <tr
+            class="posts-table__row"
+            [class.posts-table__row--with-rejection]="
+              showRejectionCallout() && post.rejectionReason
+            "
+          >
+            <td class="posts-table__cell posts-table__cell--primary">
+              <ng-container *ngTemplateOutlet="rowMain; context: { post }" />
+            </td>
+            <td class="posts-table__cell posts-table__cell--desktop">
+              <span class="posts-table__author">{{ post.author }}</span>
+            </td>
+            <td class="posts-table__cell posts-table__cell--desktop">
+              <time class="posts-table__date">{{
+                post.createdAt | date: 'MMM d, y' : undefined : locale.dateLocale()
+              }}</time>
+            </td>
+            <td class="posts-table__cell posts-table__cell--actions">
+              <ng-container *ngTemplateOutlet="rowActions; context: { post }" />
+              @if (showRejectionCallout() && post.rejectionReason) {
+                <div class="posts-table__rejection-host posts-table__rejection-host--mobile">
+                  <ng-container *ngTemplateOutlet="rejectionCallout; context: { post }" />
+                </div>
+              }
             </td>
           </tr>
+          @if (showRejectionCallout() && post.rejectionReason) {
+            <tr class="posts-table__callout-row posts-table__callout-row--desktop">
+              <td class="posts-table__callout-cell" colspan="4">
+                <ng-container *ngTemplateOutlet="rejectionCallout; context: { post }" />
+              </td>
+            </tr>
+          }
         }
-      }
-    </tbody>
-  </table>
-</div>
+      </tbody>
+    </table>
+  </div>
+}

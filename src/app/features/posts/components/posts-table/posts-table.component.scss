@@ -1,5 +1,5 @@
-@use "palette" as *;
-@use "mixins" as *;
+@use 'palette' as *;
+@use 'mixins' as *;
 
 $posts-table-desktop-min: 850px;
 $posts-table-mobile-max: $posts-table-desktop-min - 1px;
@@ -281,5 +281,72 @@ $posts-table-mobile-max: $posts-table-desktop-min - 1px;
     @include secondary-button;
     padding: 0.5rem 0.875rem;
     font-size: 0.8125rem;
+  }
+
+  &--virtual {
+    @media (min-width: $posts-table-desktop-min) {
+      .posts-table__virtual-head,
+      .posts-table__virtual-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 11rem 9rem 7rem;
+        align-items: center;
+      }
+    }
+
+    .posts-table__description,
+    .posts-table__title--single-line {
+      max-width: 100%;
+    }
+
+    .posts-table__head {
+      box-sizing: border-box;
+      padding-right: var(--posts-table-scrollbar, 0px);
+    }
+  }
+
+  &__viewport {
+    height: max(20rem, calc(100dvh - 18rem));
+  }
+
+  &__virtual-row {
+    box-sizing: border-box;
+    height: var(--posts-table-row-size);
+    overflow: hidden;
+    border-bottom: 1px solid var(--app-border);
+
+    &:hover {
+      background: var(--app-row-hover);
+    }
+
+    @media (max-width: $posts-table-mobile-max) {
+      display: block;
+      border-bottom: 0;
+      padding: 0.375rem 0.75rem;
+
+      &:hover {
+        background: transparent;
+      }
+    }
+  }
+
+  &__virtual-card {
+    display: contents;
+
+    @media (max-width: $posts-table-mobile-max) {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      border: 1px solid var(--app-border);
+      border-radius: $radius-md;
+      background: var(--app-surface);
+      overflow: hidden;
+    }
+  }
+
+  &__title--single-line {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.25rem;
   }
 }

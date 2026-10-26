@@ -2,10 +2,7 @@
   @let listViewState = viewState();
   @let isAuthenticated = auth.isAuthenticated();
 
-  <app-page-header
-    title="posts.list.title"
-    subtitle="posts.list.subtitle"
-  >
+  <app-page-header title="posts.list.title" subtitle="posts.list.subtitle">
     @if (listViewState === 'content' && isAuthenticated) {
       <a class="posts-list-page__action posts-list-page__action--desktop" routerLink="/posts/new">
         <span class="material-symbols-outlined">add</span>
@@ -22,10 +19,7 @@
       <app-error-state [message]="store.error()!" (retry)="store.retry()" />
     }
     @case ('empty') {
-      <app-empty-state
-        title="posts.list.emptyTitle"
-        description="posts.list.emptyDescription"
-      >
+      <app-empty-state title="posts.list.emptyTitle" description="posts.list.emptyDescription">
         <a routerLink="/posts/new">
           <span class="material-symbols-outlined">post_add</span>
           {{ 'common.createPost' | translate }}
@@ -64,7 +58,12 @@
             <div class="posts-list-page__filtering-bar" aria-hidden="true"></div>
           }
 
-          <app-posts-table [posts]="store.displayedPosts()" />
+          <app-posts-table
+            [posts]="store.displayedPosts()"
+            [virtualScroll]="store.isInfiniteScrollMode()"
+            [scrollGeneration]="store.listGeneration()"
+            (nearEnd)="store.loadMore()"
+          />
 
           @if (totalItems > 0) {
             @if (store.isPaginationMode()) {
@@ -76,16 +75,17 @@
                 [rangeEnd]="rangeEnd"
                 (pageChange)="store.setPage($event)"
               />
-            } @else if (store.hasMorePosts()) {
-              <div
-                class="posts-list-page__scroll-sentinel"
-                appInfiniteScroll
-                [disabled]="isFiltering"
-                (reached)="store.loadMore()"
-              >
+            } @else if (store.loadingMore()) {
+              <div class="posts-list-page__scroll-sentinel" aria-live="polite">
                 <span class="posts-list-page__scroll-dots" aria-hidden="true"></span>
-                <span>{{ 'posts.list.showingRange' | translate: { end: rangeEnd, total: totalItems } }}</span>
+                <span>{{
+                  'posts.list.showingRange' | translate: { end: rangeEnd, total: totalItems }
+                }}</span>
               </div>
+            } @else if (store.hasMorePosts()) {
+              <p class="posts-list-page__end">
+                {{ 'posts.list.showingRange' | translate: { end: rangeEnd, total: totalItems } }}
+              </p>
             } @else {
               <p class="posts-list-page__end">
                 {{ 'posts.list.showingAll' | translate: { total: totalItems } }}

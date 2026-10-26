@@ -13,6 +13,7 @@ import {
   debounceTime,
   distinctUntilChanged,
   finalize,
+  map,
   of,
   pipe,
   switchMap,
@@ -33,6 +34,7 @@ const emptyListResult = (): PostsListResult => ({ posts: [], totalItems: 0 });
 type PostsListState = {
   loading: boolean;
   filtering: boolean;
+  loadingMore: boolean;
   error: string | null;
   posts: Post[];
   totalItems: number;
@@ -41,13 +43,19 @@ type PostsListState = {
   sortOrder: PostDateSort;
   viewMode: PostsListViewMode;
   currentPage: number;
-  visibleCount: number;
+  listGeneration: number;
   initialized: boolean;
+};
+
+type LoadPostsRequest = {
+  force: boolean;
+  append: boolean;
 };
 
 const initialState = (viewMode: PostsListViewMode): PostsListState => ({
   loading: false,
   filtering: false,
+  loadingMore: false,
   error: null,
   posts: [],
   totalItems: 0,
@@ -56,7 +64,7 @@ const initialState = (viewMode: PostsListViewMode): PostsListState => ({
   sortOrder: 'desc',
   viewMode,
   currentPage: 1,
-  visibleCount: POSTS_PAGE_SIZE,
+  listGeneration: 0,
   initialized: false,
 });
 
@@ -108,34 +116,71 @@ export const PostsListStore = signalStore(
   })),
   withMethods(
     (store, api = inject(PostsApiService), viewStorage = inject(PostsViewStorageService)) => {
-      const loadPostsRx = rxMethod<boolean>(
+      let requestId = 0;
+
+      const loadPostsRx = rxMethod<LoadPostsRequest>(
         pipe(
-          tap(() => {
+          tap(({ append }) => {
             patchState(store, {
-              loading: !store.initialized(),
-              filtering: store.initialized(),
+              loading: !append && !store.initialized(),
+              filtering: !append && store.initialized(),
+              loadingMore: append,
               error: null,
             });
           }),
-          switchMap((force) =>
-            api.getPosts({ force, query: buildListQuery(store) }).pipe(
+          switchMap(({ force, append }) => {
+            const id = ++requestId;
+            const page = append ? store.currentPage() + 1 : store.currentPage();
+
+            return api.getPosts({ force, query: buildListQuery(store, page) }).pipe(
+              map((result) => ({ result, append, page, failed: false })),
               catchError(() => {
                 patchState(store, { error: 'errors.posts.load' });
-                return of(emptyListResult());
+                return of({ result: emptyListResult(), append, page, failed: true });
               }),
               finalize(() => {
+                if (id !== requestId) {
+                  return;
+                }
+
                 patchState(store, {
                   loading: false,
                   filtering: false,
+                  loadingMore: false,
                   initialized: true,
                 });
               }),
-            ),
-          ),
-          tap((result) => {
+            );
+          }),
+          tap(({ result, append, page, failed }) => {
+            if (failed) {
+              if (!append) {
+                patchState(store, {
+                  posts: result.posts,
+                  totalItems: result.totalItems,
+                  listGeneration: store.listGeneration() + 1,
+                });
+              }
+
+              return;
+            }
+
+            if (append) {
+              const posts = appendPosts(store.posts(), result.posts);
+
+              patchState(store, {
+                posts,
+                totalItems:
+                  posts.length === store.posts().length ? posts.length : result.totalItems,
+                currentPage: posts.length === store.posts().length ? store.currentPage() : page,
+              });
+              return;
+            }
+
             patchState(store, {
               posts: result.posts,
               totalItems: result.totalItems,
+              listGeneration: store.listGeneration() + 1,
             });
           }),
         ),
@@ -154,16 +199,15 @@ export const PostsListStore = signalStore(
             patchState(store, {
               searchQuery: query,
               currentPage: 1,
-              visibleCount: store.pageSize,
             });
-            loadPostsRx(false);
+            loadPostsRx({ force: false, append: false });
           }),
         ),
       );
 
       return {
         loadPosts(force = false): void {
-          loadPostsRx(force);
+          loadPostsRx({ force, append: false });
         },
         setSearchInput(query: string): void {
           patchState(store, { searchInput: query });
@@ -185,9 +229,8 @@ export const PostsListStore = signalStore(
             filtering: true,
             sortOrder: order,
             currentPage: 1,
-            visibleCount: store.pageSize,
           });
-          loadPostsRx(false);
+          loadPostsRx({ force: false, append: false });
         },
         setViewMode(mode: PostsListViewMode): void {
           if (store.viewMode() === mode) {
@@ -198,9 +241,8 @@ export const PostsListStore = signalStore(
           patchState(store, {
             viewMode: mode,
             currentPage: 1,
-            visibleCount: store.pageSize,
           });
-          loadPostsRx(false);
+          loadPostsRx({ force: false, append: false });
         },
         setPage(page: number): void {
           const nextPage = Math.min(Math.max(1, page), store.totalPages());
@@ -210,35 +252,39 @@ export const PostsListStore = signalStore(
           }
 
           patchState(store, { currentPage: nextPage });
-          loadPostsRx(false);
+          loadPostsRx({ force: false, append: false });
         },
         loadMore(): void {
-          if (!store.hasMorePosts()) {
+          if (
+            !store.hasMorePosts() ||
+            store.loadingMore() ||
+            store.loading() ||
+            store.filtering()
+          ) {
             return;
           }
 
-          patchState(store, {
-            visibleCount: Math.min(store.visibleCount() + store.pageSize, store.totalItems()),
-          });
-          loadPostsRx(false);
+          loadPostsRx({ force: false, append: true });
         },
         retry(): void {
-          loadPostsRx(true);
+          patchState(store, { currentPage: 1 });
+          loadPostsRx({ force: true, append: false });
         },
       };
     },
   ),
 );
 
-function buildListQuery(store: {
-  currentPage: () => number;
-  isInfiniteScrollMode: () => boolean;
-  isPaginationMode: () => boolean;
-  pageSize: number;
-  searchQuery: () => string;
-  sortOrder: () => PostDateSort;
-  visibleCount: () => number;
-}): PostsListQuery {
+function buildListQuery(
+  store: {
+    isInfiniteScrollMode: () => boolean;
+    isPaginationMode: () => boolean;
+    pageSize: number;
+    searchQuery: () => string;
+    sortOrder: () => PostDateSort;
+  },
+  page: number,
+): PostsListQuery {
   const query = store.searchQuery().trim();
   const base: PostsListQuery = {
     status: POST_STATUS.approved,
@@ -247,23 +293,22 @@ function buildListQuery(store: {
     order: store.sortOrder(),
   };
 
-  if (store.isPaginationMode()) {
+  if (store.isPaginationMode() || store.isInfiniteScrollMode()) {
     return {
       ...base,
-      page: store.currentPage(),
+      page,
       limit: store.pageSize,
     };
   }
 
-  if (store.isInfiniteScrollMode()) {
-    return {
-      ...base,
-      page: 1,
-      limit: store.visibleCount(),
-    };
-  }
-
   return base;
+}
+
+function appendPosts(current: Post[], incoming: Post[]): Post[] {
+  const seen = new Set(current.map((post) => post.id));
+  const next = incoming.filter((post) => !seen.has(post.id));
+
+  return next.length === 0 ? current : [...current, ...next];
 }
 
 function hasActiveFilters(searchQuery: string): boolean {
